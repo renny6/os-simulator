@@ -1,0 +1,41 @@
+# Build directories
+/build/
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.cmake
+compile_commands.json
+
+# Dependencies downloaded by FetchContent
+_deps/
+
+# Compiled Object files
+*.o
+*.obj
+
+# Executables and libraries
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.lib
+*.out
+*.app
+
+# IDE folders
+.vscode/
+.idea/
+
+# Swap files
+*.swp
+*~
+
+# Telemetry output
+simulation_results.csv
+
+# Keep config.yaml
+!config.yaml
