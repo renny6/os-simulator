@@ -95,3 +95,20 @@ target_link_libraries(stress_test PRIVATE
 )
 
 target_include_directories(stress_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+# ------------------------------------------------------------------------------
+# Priority Inheritance Verification Test
+# ------------------------------------------------------------------------------
+add_executable(priority_test
+    tests/priority_inheritance_test.cpp
+    src/core/process.cpp
+    src/core/concurrency_manager.cpp
+    src/utils/config_parser.cpp
+)
+
+target_link_libraries(priority_test PRIVATE 
+    yaml-cpp
+    Threads::Threads
+)
+
+target_include_directories(priority_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)

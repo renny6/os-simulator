@@ -2,6 +2,7 @@
 
 #include <string>
 #include <vector>
+#include <unordered_set>
 #include <shared_mutex>
 #include "../utils/config_parser.h"
 
@@ -70,6 +71,14 @@ public:
     void allocate_resources(const std::vector<int>& resources);
     void release_resources(const std::vector<int>& resources);
 
+    // Mutex Dependency Tracking
+    int get_blocked_on_mutex_id() const;
+    void set_blocked_on_mutex_id(int mutex_id);
+
+    std::unordered_set<int> get_held_mutex_ids() const;
+    void add_held_mutex(int mutex_id);
+    void remove_held_mutex(int mutex_id);
+
 private:
     int pid;
     std::string name;
@@ -81,10 +90,12 @@ private:
     int arrival_cycle;
     int starvation_counter;
     int flash_countdown;
+    int blocked_on_mutex_id = -1;
     std::vector<int> page_references;
     int page_ref_index;
     std::vector<int> max_resources;
     std::vector<int> allocated_resources;
+    std::unordered_set<int> held_mutex_ids;
 
     mutable std::shared_mutex rw_mutex;
 };

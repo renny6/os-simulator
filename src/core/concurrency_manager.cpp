@@ -144,6 +144,29 @@ void ConcurrencyManager::register_process(ProcessControlBlock* pcb) {
     }
 }
 
+void ConcurrencyManager::apply_priority_boost(int target_pid, int new_priority) {
+    ProcessControlBlock* target_pcb = nullptr;
+    for (auto pcb : pcbs_) {
+        if (pcb->get_pid() == target_pid) {
+            target_pcb = pcb;
+            break;
+        }
+    }
+    if (!target_pcb) return;
+
+    int boosted_prio = std::max(target_pcb->get_current_priority(), new_priority);
+    if (boosted_prio > target_pcb->get_current_priority()) {
+        target_pcb->set_current_priority(boosted_prio);
+        int blocked_mid = target_pcb->get_blocked_on_mutex_id();
+        if (blocked_mid != -1 && blocked_mid < static_cast<int>(mutexes_.size())) {
+            int next_owner = mutexes_[blocked_mid].owner_pid.load();
+            if (next_owner != -1 && next_owner != target_pid) {
+                apply_priority_boost(next_owner, new_priority);
+            }
+        }
+    }
+}
+
 bool ConcurrencyManager::try_acquire_mutex(int mutex_id, int pid) {
     std::lock_guard<std::mutex> lock(cm_mutex_);
     if (mutex_id < 0 || mutex_id >= static_cast<int>(mutexes_.size())) return false;
@@ -159,24 +182,24 @@ bool ConcurrencyManager::try_acquire_mutex(int mutex_id, int pid) {
         }
         if (caller) {
             m.owner_base_priority = caller->get_base_priority();
+            caller->add_held_mutex(mutex_id);
+            caller->set_blocked_on_mutex_id(-1);
         }
         return true;
     } else {
         // Push caller to wait queue
         m.wait_queue.push(pid);
         
-        // Priority Inheritance Protocol
         ProcessControlBlock* caller = nullptr;
-        ProcessControlBlock* owner = nullptr;
         for (auto pcb : pcbs_) {
-            if (pcb->get_pid() == pid) caller = pcb;
-            if (pcb->get_pid() == m.owner_pid) owner = pcb;
+            if (pcb->get_pid() == pid) { caller = pcb; break; }
         }
         
-        if (caller && owner) {
-            // If caller priority is strictly greater than current owner priority
-            if (caller->get_current_priority() > owner->get_current_priority()) {
-                owner->set_current_priority(caller->get_current_priority());
+        if (caller) {
+            caller->set_blocked_on_mutex_id(mutex_id);
+            int owner_pid = m.owner_pid.load();
+            if (owner_pid != -1 && owner_pid != pid) {
+                apply_priority_boost(owner_pid, caller->get_current_priority());
             }
         }
         return false;
@@ -197,6 +220,7 @@ void ConcurrencyManager::release_mutex(int mutex_id, int pid) {
     }
     if (owner) {
         owner->set_current_priority(m.owner_base_priority);
+        owner->remove_held_mutex(mutex_id);
     }
 
     if (!m.wait_queue.empty()) {
@@ -212,6 +236,8 @@ void ConcurrencyManager::release_mutex(int mutex_id, int pid) {
         if (next_owner) {
             m.owner_base_priority = next_owner->get_base_priority();
             next_owner->set_state(ProcessState::READY);
+            next_owner->add_held_mutex(mutex_id);
+            next_owner->set_blocked_on_mutex_id(-1);
         }
     } else {
         // Mutex is now completely free

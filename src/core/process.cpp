@@ -15,6 +15,7 @@ ProcessControlBlock::ProcessControlBlock(const utils::ProcessConfig& config)
       arrival_cycle(config.arrival_cycle),
       starvation_counter(0),
       flash_countdown(0),
+      blocked_on_mutex_id(-1),
       page_references(config.page_references),
       page_ref_index(0),
       max_resources(config.max_resources),
@@ -167,6 +168,31 @@ void ProcessControlBlock::release_resources(const std::vector<int>& resources) {
     for (size_t i = 0; i < allocated_resources.size() && i < resources.size(); ++i) {
         allocated_resources[i] -= resources[i];
     }
+}
+
+int ProcessControlBlock::get_blocked_on_mutex_id() const {
+    std::shared_lock<std::shared_mutex> lock(rw_mutex);
+    return blocked_on_mutex_id;
+}
+
+void ProcessControlBlock::set_blocked_on_mutex_id(int mutex_id) {
+    std::unique_lock<std::shared_mutex> lock(rw_mutex);
+    blocked_on_mutex_id = mutex_id;
+}
+
+std::unordered_set<int> ProcessControlBlock::get_held_mutex_ids() const {
+    std::shared_lock<std::shared_mutex> lock(rw_mutex);
+    return held_mutex_ids;
+}
+
+void ProcessControlBlock::add_held_mutex(int mutex_id) {
+    std::unique_lock<std::shared_mutex> lock(rw_mutex);
+    held_mutex_ids.insert(mutex_id);
+}
+
+void ProcessControlBlock::remove_held_mutex(int mutex_id) {
+    std::unique_lock<std::shared_mutex> lock(rw_mutex);
+    held_mutex_ids.erase(mutex_id);
 }
 
 } // namespace core

@@ -51,6 +51,8 @@ public:
     BankersMatrix get_bankers_matrix() const;
 
 private:
+    void apply_priority_boost(int target_pid, int new_priority);
+
     std::vector<ProcessControlBlock*> pcbs_;
     std::vector<KernelMutex> mutexes_;
     BankersMatrix bankers_matrix_;
