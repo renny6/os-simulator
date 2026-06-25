@@ -1,0 +1,99 @@
+# Configuration for the OS Memory & Concurrency Simulator
+# This file is the single source of truth for the entire simulation.
+
+system:
+  # number of physical RAM page frames
+  num_frames: 4
+  
+  # each page is 1 unit; keeps the math simple
+  page_size: 1
+  
+  # simulated CPU cores
+  num_cores: 2
+  
+  # Round Robin quantum in clock cycles
+  time_slice_quantum: 3
+  
+  # milliseconds between each simulated clock tick
+  tick_interval_ms: 300
+  
+  # CPU Scheduling algorithm (options: RR, SRTF)
+  scheduling_algorithm: "RR"
+  
+  # Page replacement algorithm (options: FIFO, LRU, CLOCK, OPT)
+  page_replacement_algorithm: "FIFO"
+  
+  # fault rate above which thrashing is declared
+  thrashing_fault_threshold: 0.8
+  
+  # cycles before thrashing detection activates (= num_frames * 2)
+  warmup_cycles: 8
+  
+  # maximum number of telemetry events to retain in memory
+  telemetry_ring_buffer_size: 1000
+  
+  # relative or absolute path for exporting simulation telemetry
+  output_csv_path: "simulation_results.csv"
+
+resources:
+  # Total available quantities in the system for resources R0, R1, and R2
+  total_resources: [7, 5, 3]
+
+processes:
+  - pid: 1
+    # human-readable string for the TUI PCB table
+    name: "System_Daemon"
+    # total CPU cycles this process needs
+    burst_time: 50
+    # integer 1-5, where 5 is highest
+    priority: 5
+    # the clock cycle at which this process enters the ready queue
+    arrival_cycle: 0
+    # the MAXIMUM of each resource type this process will EVER request (R0, R1, R2)
+    max_resources: [4, 3, 3]
+    # resources allocated to it at start
+    initial_resources: [1, 1, 0]
+    # ordered list of page numbers this process will request
+    page_references: [1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3]
+
+  - pid: 2
+    name: "DB_Worker"
+    burst_time: 120
+    priority: 2
+    arrival_cycle: 2
+    max_resources: [3, 1, 1]
+    initial_resources: [2, 0, 1]
+    page_references: [6, 7, 8, 9, 6, 7, 8, 9, 6, 7, 8, 9, 1, 2, 3, 4, 5]
+
+  - pid: 3
+    name: "Log_Aggregator"
+    burst_time: 20
+    priority: 4
+    arrival_cycle: 5
+    max_resources: [4, 2, 1]
+    initial_resources: [1, 0, 0]
+    page_references: [10, 11, 12, 10, 11, 12, 10, 11, 12, 1, 2, 3, 10, 11, 12]
+
+  - pid: 4
+    name: "Web_Server"
+    burst_time: 80
+    priority: 3
+    arrival_cycle: 10
+    max_resources: [2, 2, 2]
+    initial_resources: [0, 1, 0]
+    page_references: [13, 14, 15, 16, 13, 14, 15, 16, 1, 2, 13, 14, 15, 16, 3]
+
+  - pid: 5
+    name: "Backup_Agent"
+    burst_time: 200
+    priority: 1
+    arrival_cycle: 15
+    max_resources: [3, 2, 2]
+    initial_resources: [0, 0, 0]
+    page_references: [17, 18, 19, 20, 21, 17, 18, 19, 20, 21, 17, 18, 19, 20, 21]
+
+validation:
+  # Expected result: When run with FIFO page replacement and 3 frames, 
+  # this exact sequence should produce exactly 15 page faults. 
+  # Used by the automated verification suite.
+  validation_trace: [1, 2, 3, 4, 2, 3, 5, 6, 2, 1, 2, 3, 7, 6, 3, 3, 1, 2, 3, 6]
