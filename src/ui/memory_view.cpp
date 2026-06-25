@@ -1,4 +1,4 @@
-#include "../../include/ui/memory_view.h"
+#include "ui/memory_view.h"
 
 namespace ui {
 

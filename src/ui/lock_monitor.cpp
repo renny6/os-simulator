@@ -1,4 +1,4 @@
-#include "../../include/ui/lock_monitor.h"
+#include "ui/lock_monitor.h"
 
 namespace ui {
 

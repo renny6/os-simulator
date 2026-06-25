@@ -1,8 +1,10 @@
-#include "../../include/memory/mmu.h"
-#include "../../include/memory/fifo_strategy.h"
-#include "../../include/memory/lru_strategy.h"
-#include "../../include/memory/clock_strategy.h"
-#include "../../include/memory/opt_strategy.h"
+#include "memory/mmu.h"
+#include "memory/fifo_strategy.h"
+#include "memory/lru_strategy.h"
+#include "memory/clock_strategy.h"
+#include "memory/opt_strategy.h"
+#include <mutex>
+#include <shared_mutex>
 
 namespace memory {
 

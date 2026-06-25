@@ -1,4 +1,4 @@
-#include "../../include/memory/lru_strategy.h"
+#include "memory/lru_strategy.h"
 
 namespace memory {
 

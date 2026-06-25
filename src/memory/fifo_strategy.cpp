@@ -1,4 +1,4 @@
-#include "../../include/memory/fifo_strategy.h"
+#include "memory/fifo_strategy.h"
 
 namespace memory {
 

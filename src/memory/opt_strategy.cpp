@@ -1,4 +1,4 @@
-#include "../../include/memory/opt_strategy.h"
+#include "memory/opt_strategy.h"
 #include <string>
 
 namespace memory {

@@ -42,8 +42,13 @@ public:
     bool try_acquire_mutex(int mutex_id, int pid);
     void release_mutex(int mutex_id, int pid);
 
+    int get_mutex_owner(int mutex_id) const;
+    std::vector<int> get_mutex_waiters(int mutex_id) const;
+
     bool request_resources(int pid, const std::vector<int>& request);
     void release_resources(int pid, const std::vector<int>& release);
+
+    BankersMatrix get_bankers_matrix() const;
 
 private:
     std::vector<ProcessControlBlock*> pcbs_;

@@ -1,13 +1,13 @@
-#include "include/utils/config_parser.h"
-#include "include/utils/telemetry.h"
-#include "include/memory/mmu.h"
-#include "include/core/concurrency_manager.h"
-#include "include/core/cpu_scheduler.h"
-#include "include/core/process.h"
-#include "include/ui/memory_view.h"
-#include "include/ui/lock_monitor.h"
-#include "include/ui/telemetry_view.h"
-#include "include/ui/dashboard.h"
+#include "utils/config_parser.h"
+#include "utils/telemetry.h"
+#include "memory/mmu.h"
+#include "core/concurrency_manager.h"
+#include "core/cpu_scheduler.h"
+#include "core/process.h"
+#include "ui/memory_view.h"
+#include "ui/lock_monitor.h"
+#include "ui/telemetry_view.h"
+#include "ui/dashboard.h"
 
 #include <ftxui/component/component.hpp>
 #include <ftxui/component/screen_interactive.hpp>
@@ -17,6 +17,10 @@
 #include <atomic>
 #include <mutex>
 #include <iostream>
+
+namespace core {
+    ConcurrencyManager* g_cm = nullptr;
+}
 
 std::atomic<bool> simulation_running{true};
 
@@ -38,7 +42,7 @@ void backend_loop(
         
         utils::CycleMetrics metrics;
         metrics.cycle_id = cycle_id++;
-        metrics.active_pid = -1; // Placeholder as header didn't expose active process
+        metrics.active_pid = -1; 
         metrics.cpu_utilization_percent = 100.0f; 
         metrics.total_page_faults = 0;
         metrics.total_tlb_hits = 0;
@@ -50,15 +54,23 @@ void backend_loop(
         
         telemetry.push(metrics);
 
-        // Update UI Snapshots via thread-safe read locks
         mem_view.update_snapshot(mmu.get_frames_snapshot());
         tel_view.update_snapshot(metrics);
         
-        ui::BankersSnapshot b_snap;
+        core::BankersMatrix bm = concurrency.get_bankers_matrix();
+        ui::BankersSnapshot b_snap{bm.available, bm.maximum, bm.allocation, bm.need};
         lock_monitor.update_bankers_snapshot(b_snap);
-        lock_monitor.update_mutex_snapshot({});
+        
+        std::vector<ui::MutexSnapshot> m_snaps;
+        for (int i = 0; i < 6; ++i) {
+            int owner = concurrency.get_mutex_owner(i);
+            std::vector<int> waiters = concurrency.get_mutex_waiters(i);
+            if (owner != -1 || !waiters.empty()) {
+                m_snaps.push_back({owner, waiters});
+            }
+        }
+        lock_monitor.update_mutex_snapshot(m_snaps);
 
-        // Safely trigger a re-render on the main thread
         screen.PostEvent(ftxui::Event::Custom);
 
         std::this_thread::sleep_for(std::chrono::milliseconds(tick_interval_ms));
@@ -72,6 +84,7 @@ int main() {
         utils::TelemetryLogger telemetry(config.system.output_csv_path, config.system.telemetry_ring_buffer_size);
         memory::MemoryManagementUnit mmu(config.system.num_frames, config.system.page_replacement_algorithm);
         core::ConcurrencyManager concurrency_manager;
+        core::g_cm = &concurrency_manager;
         core::CpuScheduler scheduler;
 
         for (const auto& pconf : config.processes) {
@@ -84,7 +97,6 @@ int main() {
         ui::LockMonitor lock_monitor;
         ui::TelemetryView telemetry_view;
         
-        // Unified UI Composition
         auto main_layout = ftxui::Container::Horizontal({
             memory_view.get_component(),
             lock_monitor.get_component(),
@@ -103,17 +115,14 @@ int main() {
 
         auto screen = ftxui::ScreenInteractive::Fullscreen();
 
-        // Launch backend simulation
         std::thread backend_thread(backend_loop, 
             std::ref(scheduler), std::ref(mmu), std::ref(concurrency_manager), std::ref(telemetry), 
             config.system.tick_interval_ms,
             std::ref(memory_view), std::ref(lock_monitor), std::ref(telemetry_view), std::ref(screen)
         );
 
-        // Blocks until user exits UI (e.g. via 'q' or escape)
         screen.Loop(renderer);
 
-        // Graceful teardown
         simulation_running = false;
         backend_thread.join();
 

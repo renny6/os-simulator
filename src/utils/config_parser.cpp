@@ -1,4 +1,4 @@
-#include "../../include/utils/config_parser.h"
+#include "utils/config_parser.h"
 #include <yaml-cpp/yaml.h>
 #include <stdexcept>
 

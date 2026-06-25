@@ -1,4 +1,4 @@
-#include "../../include/ui/dashboard.h"
+#include "ui/dashboard.h"
 
 namespace ui {
 

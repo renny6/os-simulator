@@ -65,7 +65,7 @@ add_executable(os_simulator
 )
 
 # Include directories mapping
-target_include_directories(os_simulator PRIVATE include)
+target_include_directories(os_simulator PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 # ------------------------------------------------------------------------------
 # Linking Phase
@@ -77,3 +77,21 @@ target_link_libraries(os_simulator PRIVATE
     yaml-cpp
     Threads::Threads
 )
+
+# ------------------------------------------------------------------------------
+# Automated Verification Tests
+# ------------------------------------------------------------------------------
+add_executable(stress_test 
+    tests/stress_test.cpp
+    src/core/process.cpp
+    src/core/cpu_scheduler.cpp
+    src/core/concurrency_manager.cpp
+    src/utils/config_parser.cpp
+)
+
+target_link_libraries(stress_test PRIVATE 
+    yaml-cpp
+    Threads::Threads
+)
+
+target_include_directories(stress_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)

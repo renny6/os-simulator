@@ -1,4 +1,4 @@
-#include "../../include/ui/telemetry_view.h"
+#include "ui/telemetry_view.h"
 
 namespace ui {
 

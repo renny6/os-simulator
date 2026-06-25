@@ -1,4 +1,4 @@
-#include "../../include/memory/clock_strategy.h"
+#include "memory/clock_strategy.h"
 
 namespace memory {
 

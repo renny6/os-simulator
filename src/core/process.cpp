@@ -1,4 +1,6 @@
-#include "../../include/core/process.h"
+#include "core/process.h"
+#include <mutex>
+#include <shared_mutex>
 
 namespace core {
 

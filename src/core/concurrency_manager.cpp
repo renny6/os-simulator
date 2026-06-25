@@ -1,6 +1,8 @@
-#include "../../include/core/concurrency_manager.h"
-#include "../../include/utils/config_parser.h"
+#include "core/concurrency_manager.h"
+#include "utils/config_parser.h"
 #include <iostream>
+#include <mutex>
+#include <shared_mutex>
 
 namespace core {
 
@@ -106,6 +108,7 @@ void BankersMatrix::release_resources(int pid, const std::vector<int>& release) 
 // ==========================================
 
 // Pre-allocate a fixed size pool of KernelMutex objects to bypass std::mutex non-copyable vector limitations
+
 ConcurrencyManager::ConcurrencyManager() : mutexes_(64) {
     try {
         auto config = utils::ConfigParser::parse("config.yaml");
@@ -208,11 +211,30 @@ void ConcurrencyManager::release_mutex(int mutex_id, int pid) {
         }
         if (next_owner) {
             m.owner_base_priority = next_owner->get_base_priority();
+            next_owner->set_state(ProcessState::READY);
         }
     } else {
         // Mutex is now completely free
         m.owner_pid = -1;
     }
+}
+
+int ConcurrencyManager::get_mutex_owner(int mutex_id) const {
+    std::lock_guard<std::mutex> lock(cm_mutex_);
+    if (mutex_id < 0 || mutex_id >= static_cast<int>(mutexes_.size())) return -1;
+    return mutexes_[mutex_id].owner_pid.load();
+}
+
+std::vector<int> ConcurrencyManager::get_mutex_waiters(int mutex_id) const {
+    std::lock_guard<std::mutex> lock(cm_mutex_);
+    if (mutex_id < 0 || mutex_id >= static_cast<int>(mutexes_.size())) return {};
+    std::vector<int> res;
+    std::queue<int> q_copy = mutexes_[mutex_id].wait_queue;
+    while (!q_copy.empty()) {
+        res.push_back(q_copy.front());
+        q_copy.pop();
+    }
+    return res;
 }
 
 bool ConcurrencyManager::request_resources(int pid, const std::vector<int>& request) {
@@ -234,17 +256,19 @@ bool ConcurrencyManager::request_resources(int pid, const std::vector<int>& requ
 
 void ConcurrencyManager::release_resources(int pid, const std::vector<int>& release) {
     std::lock_guard<std::mutex> lock(cm_mutex_);
-    
-    // Perform bankers release
     bankers_matrix_.release_resources(pid, release);
     
-    // Mirror the state directly into the PCB so the UI can snapshot it
     for (auto pcb : pcbs_) {
         if (pcb->get_pid() == pid) {
             pcb->release_resources(release);
             break;
         }
     }
+}
+
+BankersMatrix ConcurrencyManager::get_bankers_matrix() const {
+    std::lock_guard<std::mutex> lock(cm_mutex_);
+    return bankers_matrix_;
 }
 
 } // namespace core
