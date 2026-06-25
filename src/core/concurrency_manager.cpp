@@ -89,16 +89,18 @@ bool BankersMatrix::request_resources(int pid, const std::vector<int>& request) 
 }
 
 void BankersMatrix::release_resources(int pid, const std::vector<int>& release) {
-    if (pid >= allocation.size() || allocation[pid].empty() || release.size() > available.size()) {
+    if (pid < 0 || pid >= static_cast<int>(allocation.size()) || allocation[pid].empty() || release.size() > available.size()) {
         return;
     }
 
     for (size_t i = 0; i < release.size(); ++i) {
-        if (release[i] > allocation[pid][i]) continue; // Prevent negative allocation anomaly
+        if (i >= allocation[pid].size() || release[i] > allocation[pid][i]) continue; // Prevent negative allocation anomaly
 
         available[i] += release[i];
         allocation[pid][i] -= release[i];
-        need[pid][i] += release[i]; // Need conceptually increases as we release
+        if (i < need[pid].size()) {
+            need[pid][i] += release[i]; // Need conceptually increases as we release
+        }
     }
 }
 
@@ -129,18 +131,27 @@ void ConcurrencyManager::register_process(ProcessControlBlock* pcb) {
         bankers_matrix_.need.resize(pid + 1);
     }
 
-    bankers_matrix_.maximum[pid] = pcb->get_max_resources();
-    bankers_matrix_.allocation[pid] = pcb->get_allocated_resources();
+    size_t num_res = bankers_matrix_.available.size();
+    if (pcb->get_max_resources().size() > num_res) num_res = pcb->get_max_resources().size();
+    if (pcb->get_allocated_resources().size() > num_res) num_res = pcb->get_allocated_resources().size();
+
+    auto max_res = pcb->get_max_resources();
+    auto alloc_res = pcb->get_allocated_resources();
+    max_res.resize(num_res, 0);
+    alloc_res.resize(num_res, 0);
+
+    bankers_matrix_.maximum[pid] = max_res;
+    bankers_matrix_.allocation[pid] = alloc_res;
     
-    std::vector<int> need_vec(bankers_matrix_.maximum[pid].size(), 0);
-    for (size_t i = 0; i < need_vec.size(); ++i) {
-        need_vec[i] = bankers_matrix_.maximum[pid][i] - bankers_matrix_.allocation[pid][i];
+    std::vector<int> need_vec(num_res, 0);
+    for (size_t i = 0; i < num_res; ++i) {
+        need_vec[i] = std::max(0, max_res[i] - alloc_res[i]);
     }
     bankers_matrix_.need[pid] = need_vec;
 
     // Deduct initial allocations from the available pool across the entire system
-    for (size_t i = 0; i < bankers_matrix_.allocation[pid].size() && i < bankers_matrix_.available.size(); ++i) {
-        bankers_matrix_.available[i] -= bankers_matrix_.allocation[pid][i];
+    for (size_t i = 0; i < alloc_res.size() && i < bankers_matrix_.available.size(); ++i) {
+        bankers_matrix_.available[i] -= alloc_res[i];
     }
 }
 

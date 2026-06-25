@@ -5,6 +5,7 @@
 #include <shared_mutex>
 #include <cstdint>
 #include <string>
+#include <functional>
 #include "page_replacer.h"
 
 namespace memory {
@@ -35,11 +36,19 @@ public:
     // Snapshots for the UI thread
     std::vector<PageFrame> get_frames_snapshot() const;
 
+    // Hook up thrashing pressure detector callback
+    void set_pressure_callback(std::function<void(double)> callback);
+
 private:
     std::vector<PageFrame> frames;
     std::unique_ptr<PageReplacer> replacer;
     const std::vector<int>* current_page_references;
     size_t current_reference_index;
+
+    std::function<void(double)> pressure_callback;
+    uint64_t window_access_count;
+    uint64_t window_fault_count;
+    double pressure_threshold;
 
     mutable std::shared_mutex vmm_mutex;
 };

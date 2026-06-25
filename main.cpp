@@ -3,6 +3,7 @@
 #include "memory/mmu.h"
 #include "core/concurrency_manager.h"
 #include "core/cpu_scheduler.h"
+#include "core/thrashing_detector.h"
 #include "core/process.h"
 #include "ui/memory_view.h"
 #include "ui/lock_monitor.h"
@@ -86,6 +87,11 @@ int main() {
         core::ConcurrencyManager concurrency_manager;
         core::g_cm = &concurrency_manager;
         core::CpuScheduler scheduler;
+
+        core::ThrashingDetector thrashing_detector(mmu, scheduler);
+        mmu.set_pressure_callback([&thrashing_detector](double fault_rate) {
+            thrashing_detector.on_memory_pressure(fault_rate);
+        });
 
         for (const auto& pconf : config.processes) {
             auto pcb = std::make_unique<core::ProcessControlBlock>(pconf);

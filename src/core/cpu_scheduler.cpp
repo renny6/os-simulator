@@ -247,4 +247,27 @@ void CpuScheduler::run_loop() {
     tick();
 }
 
+void CpuScheduler::suspend_highest_burst_process() {
+    ProcessControlBlock* target = nullptr;
+    int max_burst = -1;
+    int runnable_count = 0;
+    for (const auto& pcb : processes_) {
+        if (pcb->get_current_state() == ProcessState::READY || pcb->get_current_state() == ProcessState::RUNNING) {
+            runnable_count++;
+            if (pcb->get_burst_time() > max_burst) {
+                max_burst = pcb->get_burst_time();
+                target = pcb.get();
+            }
+        }
+    }
+    if (target && runnable_count > 1) {
+        target->set_state(ProcessState::SUSPENDED);
+        if (active_process_ == target) {
+            active_process_ = nullptr;
+        }
+        std::cout << "[Thrashing Mitigation] Suspended Process " << target->get_name() 
+                  << " (PID: " << target->get_pid() << ", Burst: " << max_burst << ") to clear frames.\n";
+    }
+}
+
 } // namespace core

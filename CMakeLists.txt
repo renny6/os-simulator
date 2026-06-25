@@ -45,6 +45,7 @@ add_executable(os_simulator
     src/core/process.cpp
     src/core/cpu_scheduler.cpp
     src/core/concurrency_manager.cpp
+    src/core/thrashing_detector.cpp
     
     # Memory Subsystem
     src/memory/mmu.cpp
@@ -112,3 +113,27 @@ target_link_libraries(priority_test PRIVATE
 )
 
 target_include_directories(priority_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+# ------------------------------------------------------------------------------
+# Thrashing Mitigation Stress Verification Test
+# ------------------------------------------------------------------------------
+add_executable(thrashing_stress_test
+    tests/thrashing_stress_test.cpp
+    src/core/process.cpp
+    src/core/cpu_scheduler.cpp
+    src/core/concurrency_manager.cpp
+    src/core/thrashing_detector.cpp
+    src/memory/mmu.cpp
+    src/memory/fifo_strategy.cpp
+    src/memory/lru_strategy.cpp
+    src/memory/clock_strategy.cpp
+    src/memory/opt_strategy.cpp
+    src/utils/config_parser.cpp
+)
+
+target_link_libraries(thrashing_stress_test PRIVATE 
+    yaml-cpp
+    Threads::Threads
+)
+
+target_include_directories(thrashing_stress_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)

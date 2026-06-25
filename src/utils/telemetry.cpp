@@ -11,9 +11,6 @@ TelemetryLogger::TelemetryLogger(const std::string& output_csv_path, size_t max_
     if (!out_stream_.is_open()) {
         std::cerr << "Failed to open telemetry output file: " << output_csv_path << "\n";
     } else {
-        // Write CSV header based on the CycleMetrics fields. 
-        // Note: although the implementation plan briefly mentioned a "3-column CSV header", 
-        // we are accurately serializing the full 10 fields defined in the schema for CycleMetrics.
         out_stream_ << "cycle_id,active_pid,cpu_utilization_percent,total_page_faults,"
                     << "total_tlb_hits,total_tlb_misses,deadlocks_prevented,frames_in_use,"
                     << "belady_anomaly_detected,thrashing_detected\n";
@@ -30,11 +27,10 @@ TelemetryLogger::~TelemetryLogger() {
         writer_thread_.join();
     }
     
-    // Flush any remaining items left in the buffer before shutting down
     std::deque<CycleMetrics> remaining_buffer;
     {
         std::lock_guard<std::mutex> lock(telemetry_mutex_);
-        remaining_buffer.swap(buffer_);
+        remaining_buffer.swap(write_queue_);
     }
 
     if (out_stream_.is_open() && !remaining_buffer.empty()) {
@@ -61,12 +57,23 @@ TelemetryLogger::~TelemetryLogger() {
 void TelemetryLogger::push(const CycleMetrics& metrics) {
     {
         std::lock_guard<std::mutex> lock(telemetry_mutex_);
-        if (buffer_.size() >= max_buffer_size_) {
-            buffer_.pop_front();
+        if (history_buffer_.size() >= max_buffer_size_) {
+            history_buffer_.pop_front();
         }
-        buffer_.push_back(metrics);
+        history_buffer_.push_back(metrics);
+        write_queue_.push_back(metrics);
     }
     cv_.notify_one();
+}
+
+double TelemetryLogger::calculate_moving_average(size_t window_size) const {
+    std::lock_guard<std::mutex> lock(telemetry_mutex_);
+    return utils::calculate_moving_average(history_buffer_, window_size);
+}
+
+std::deque<CycleMetrics> TelemetryLogger::get_history() const {
+    std::lock_guard<std::mutex> lock(telemetry_mutex_);
+    return history_buffer_;
 }
 
 void TelemetryLogger::writer_loop() {
@@ -74,9 +81,9 @@ void TelemetryLogger::writer_loop() {
         std::deque<CycleMetrics> local_buffer;
         {
             std::unique_lock<std::mutex> lock(telemetry_mutex_);
-            cv_.wait(lock, [this]() { return !buffer_.empty() || stop_flag_; });
+            cv_.wait(lock, [this]() { return !write_queue_.empty() || stop_flag_; });
             
-            local_buffer.swap(buffer_);
+            local_buffer.swap(write_queue_);
         }
 
         if (out_stream_.is_open() && !local_buffer.empty()) {

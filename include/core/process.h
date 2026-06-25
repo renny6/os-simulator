@@ -12,7 +12,8 @@ enum class ProcessState {
     READY,
     RUNNING,
     BLOCKED,
-    TERMINATED
+    TERMINATED,
+    SUSPENDED
 };
 
 struct PCBSnapshot {

@@ -22,6 +22,9 @@ public:
     void tick();
     void context_switch();
 
+    // Thrashing mitigation helper
+    void suspend_highest_burst_process();
+
 private:
     ProcessControlBlock* select_next_process();
 

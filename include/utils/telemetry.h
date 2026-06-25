@@ -8,6 +8,7 @@
 #include <string>
 #include <fstream>
 #include <atomic>
+#include <algorithm>
 
 namespace utils {
 
@@ -28,45 +29,54 @@ struct CycleMetrics {
 };
 
 /**
+ * @brief Standalone helper function to calculate the moving average of page faults over a given window.
+ * 
+ * @param history Collection of historical cycle metrics.
+ * @param window_size Number of recent cycles to average over.
+ * @return double Moving average of page faults.
+ */
+inline double calculate_moving_average(const std::deque<CycleMetrics>& history, size_t window_size) {
+    if (history.empty() || window_size == 0) return 0.0;
+    size_t count = std::min(window_size, history.size());
+    double sum = 0.0;
+    for (size_t i = history.size() - count; i < history.size(); ++i) {
+        sum += history[i].total_page_faults;
+    }
+    return sum / count;
+}
+
+/**
  * @brief Thread-safe logger that stores telemetry in a ring buffer and writes incrementally to a CSV.
  */
 class TelemetryLogger {
 public:
-    /**
-     * @brief Constructs the telemetry logger, opens the output file, and starts the writer thread.
-     * 
-     * @param output_csv_path Path to the CSV file where metrics will be recorded.
-     * @param max_buffer_size Maximum number of items in the ring buffer before oldest are discarded.
-     */
     TelemetryLogger(const std::string& output_csv_path, size_t max_buffer_size);
-
-    /**
-     * @brief Destructor gracefully stops the writer loop and flushes remaining buffer contents.
-     */
     ~TelemetryLogger();
 
-    // Disable copy semantics to manage thread and file resources safely
     TelemetryLogger(const TelemetryLogger&) = delete;
     TelemetryLogger& operator=(const TelemetryLogger&) = delete;
 
-    /**
-     * @brief Safely adds a metrics record to the ring buffer and notifies the writer thread.
-     * 
-     * @param metrics The metrics to record for the cycle.
-     */
     void push(const CycleMetrics& metrics);
 
-private:
     /**
-     * @brief Background writer loop that drains the buffer and writes to the CSV incrementally.
+     * @brief Calculates moving average of total_page_faults across retained history.
      */
+    double calculate_moving_average(size_t window_size) const;
+
+    /**
+     * @brief Returns a snapshot of retained history records.
+     */
+    std::deque<CycleMetrics> get_history() const;
+
+private:
     void writer_loop();
 
-    std::deque<CycleMetrics> buffer_;
+    std::deque<CycleMetrics> history_buffer_;
+    std::deque<CycleMetrics> write_queue_;
     size_t max_buffer_size_;
     std::ofstream out_stream_;
 
-    std::mutex telemetry_mutex_;
+    mutable std::mutex telemetry_mutex_;
     std::condition_variable cv_;
     std::atomic<bool> stop_flag_;
     std::thread writer_thread_;
